@@ -10,6 +10,8 @@ tramp
 /.gradle/
 /gradle/
 *.code-workspace
+/.cache/
+compile_commands.json
 
 # Prerequisites
 *.d
@@ -44,5 +46,7 @@ tramp
 *.out
 *.app
 
+build/
+
 # Misc
-eepget
+# eepget

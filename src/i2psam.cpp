@@ -13,8 +13,9 @@
 #include <ctime>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
-#include "i2psam.h"
+#include "i2psam/i2psam.h"
 
 #define PORT_ZERO 0
 #define I2P_MIN_DESTINATION_SIZE 521
@@ -214,7 +215,7 @@ SAMSession::SAMSession(
     const std::string &SAMHost       /*= SAM_DEFAULT_ADDRESS*/,
     uint16_t SAMPort                 /*= SAM_DEFAULT_PORT_TCP*/,
     const std::string &i2pOptions    /*= SAM_DEFAULT_I2P_OPTIONS*/,
-    const std::string &signatureType /*= SAM_SIGNATURE_TYPE */)
+    [[maybe_unused]] const std::string &signatureType /*= SAM_SIGNATURE_TYPE */)
     : socket_(SAMHost, SAMPort),
       nickname_(nickname),
       sessionID_(generateSessionID()),
@@ -271,10 +272,10 @@ RequestResult<const std::string> SAMSession::namingLookup(const std::string &nam
 
   std::unique_ptr<I2pSocket> newSocket(new I2pSocket(socket_));
   const AnswerType answer = namingLookup(*newSocket, name);
-  switch (answer.status)
+  switch (answer.status_)
     {
       case Message::OK:
-        return ResultType(answer.value);
+        return ResultType(answer.value_);
       case Message::EMPTY_ANSWER:
       case Message::CLOSED_SOCKET:
         fallSick();
@@ -292,10 +293,10 @@ RequestResult<const FullDestination> SAMSession::destGenerate() const
 
   std::unique_ptr<I2pSocket> newSocket(new I2pSocket(socket_));
   const AnswerType answer = destGenerate(*newSocket);
-  switch (answer.status)
+  switch (answer.status_)
     {
       case Message::OK:
-        return ResultType(answer.value);
+        return ResultType(answer.value_);
       case Message::EMPTY_ANSWER:
       case Message::CLOSED_SOCKET:
         fallSick();
@@ -308,7 +309,7 @@ RequestResult<const FullDestination> SAMSession::destGenerate() const
 
 FullDestination SAMSession::createSession(const std::string& destination)
 {
-  return createSession(destination, SAM_SIGNATURE_TYPE);
+  return createSession(destination, SAM_SIGNATURE_TYPE.data());
 }
 
 FullDestination SAMSession::createSession(const std::string& destination, const std::string& sigType)
@@ -339,14 +340,14 @@ Message::Answer<const std::string> SAMSession::request(I2pSocket &socket,
   typedef Message::Answer<const std::string> AnswerType;
 
   const AnswerType answer = rawRequest(socket, requestStr);
-  return (answer.status == Message::OK) ? AnswerType(answer.status, Message::getValue(answer.value, keyOnSuccess))
+  return (answer.status_ == Message::OK) ? AnswerType(answer.status_, Message::getValue(answer.value_, keyOnSuccess))
                                         : answer;
 }
 
 /*static*/
 Message::eStatus SAMSession::request(I2pSocket &socket, const std::string &requestStr)
 {
-  return rawRequest(socket, requestStr).status;
+  return rawRequest(socket, requestStr).status_;
 }
 
 /*static*/
@@ -398,7 +399,7 @@ const std::string &SAMSession::getOptions() const
 const FullDestination &SAMSession::getMyDestination() const
 {
 #ifdef DEBUG_ON_STDOUT
-  std::cout << "getMyDestination: " << myDestination_.priv << std::endl;
+  std::cout << "getMyDestination: " << myDestination_.priv_ << std::endl;
 #endif // DEBUG_ON_STDOUT
   return myDestination_;
 }
@@ -470,7 +471,7 @@ StreamSession::StreamSession(StreamSession &rhs)
 {
   rhs.fallSick();
   rhs.socket_.close();
-  (void) createStreamSession(myDestination_.priv);
+  (void) createStreamSession(myDestination_.priv_);
 
   for (const auto &forwardedStream : rhs.forwardedStreams_)
     forward(forwardedStream.host, forwardedStream.port, forwardedStream.silent);
@@ -540,29 +541,33 @@ RequestResult<void> StreamSession::forward(const std::string &host, uint16_t por
 {
   typedef RequestResult<void> ResultType;
 
-  std::unique_ptr<I2pSocket> newSocket(new I2pSocket(socket_));
+  auto newSocket = std::make_unique<I2pSocket>(socket_);
+
   const Message::eStatus status = forward(*newSocket, sessionID_, host, port, silent);
+
   switch (status)
     {
       case Message::OK:
-        forwardedStreams_.push_back(ForwardedStream(newSocket.get(), host, port, silent));
-        newSocket.release(); // release after successful push_back only
+        forwardedStreams_.emplace_back(ForwardedStream(std::move(&newSocket), host, port, silent));
+
         return ResultType(true);
       case Message::EMPTY_ANSWER:
       case Message::CLOSED_SOCKET:
       case Message::INVALID_ID:
       case Message::I2P_ERROR:
         fallSick();
+
         break;
       default:
         break;
     }
+
   return ResultType();
 }
 
 FullDestination StreamSession::createStreamSession(const std::string &destination)
 {
-   return createStreamSession(destination, SAM_SIGNATURE_TYPE);
+   return createStreamSession(destination, SAM_SIGNATURE_TYPE.data());
 }
 
 FullDestination StreamSession::createStreamSession(const std::string& destination, const std::string& sigType)
@@ -576,12 +581,12 @@ FullDestination StreamSession::createStreamSession(const std::string& destinatio
 
   const AnswerType
       answer = createStreamSession(socket_, sessionID_, nickname_, destination, i2pOptions, sigType);
-  if (answer.status != Message::OK)
+  if (answer.status_ != Message::OK)
     {
       fallSick();
       return FullDestination();
     }
-  return FullDestination(answer.value.c_str(), answer.value, (destination == SAM_GENERATE_MY_DESTINATION));
+  return FullDestination(answer.value_.c_str(), answer.value_, (destination == SAM_GENERATE_MY_DESTINATION.data()));
 }
 
 FullDestination StreamSession::createSession(const std::string& destination, const std::string& sigType, const std::string& i2pOptions)
@@ -590,12 +595,12 @@ FullDestination StreamSession::createSession(const std::string& destination, con
 
   const AnswerType
       answer = createStreamSession(socket_, sessionID_, nickname_, destination, i2pOptions, sigType);
-  if (answer.status != Message::OK)
+  if (answer.status_ != Message::OK)
     {
       fallSick();
       return FullDestination();
     }
-  return FullDestination(answer.value.c_str(), answer.value, (destination == SAM_GENERATE_MY_DESTINATION));
+  return FullDestination(answer.value_.c_str(), answer.value_, (destination == SAM_GENERATE_MY_DESTINATION.data()));
 }
 
 void StreamSession::stopForwarding(const std::string &host, uint16_t port)
@@ -688,7 +693,7 @@ DatagramSession::DatagramSession(DatagramSession &rhs)
   myDestination_ = rhs.myDestination_;
   rhs.fallSick();
   rhs.socket_.close();
-  (void) createDatagramSession(myDestination_.priv);
+  (void) createDatagramSession(myDestination_.priv_);
 
 #ifdef DEBUG_ON_STDOUT
   std::cout << "Created a new SAM datagram session (" << sessionID_ << ")  from another (" << rhs.sessionID_ << ")" << std::endl;
@@ -704,7 +709,7 @@ DatagramSession::~DatagramSession()
 
 FullDestination DatagramSession::createDatagramSession(const std::string& destination)
 {
-  return createDatagramSession(destination, SAM_SIGNATURE_TYPE);
+  return createDatagramSession(destination, SAM_SIGNATURE_TYPE.data());
 }
 
 FullDestination DatagramSession::createDatagramSession(const std::string& destination, const std::string& sigType)
@@ -717,12 +722,12 @@ FullDestination DatagramSession::createDatagramSession(const std::string& destin
   typedef Message::Answer<const std::string> AnswerType;
 
   const AnswerType answer = createDatagramSession(socket_, sessionID_, nickname_, listenPortUDP_, listenAddress_, destination, i2pOptions, sigType);
-  if (answer.status != Message::OK)
+  if (answer.status_ != Message::OK)
     {
       fallSick();
       return FullDestination();
     }
-  return FullDestination(answer.value.c_str(), answer.value, (destination == SAM_GENERATE_MY_DESTINATION));
+  return FullDestination(answer.value_.c_str(), answer.value_, (destination == SAM_GENERATE_MY_DESTINATION.data()));
 }
 
 FullDestination DatagramSession::createSession(const std::string& destination, const std::string& sigType, const std::string& i2pOptions)
@@ -730,12 +735,12 @@ FullDestination DatagramSession::createSession(const std::string& destination, c
   typedef Message::Answer<const std::string> AnswerType;
 
   const AnswerType answer = createDatagramSession(socket_, sessionID_, nickname_, listenPortUDP_, listenAddress_, destination, i2pOptions, sigType);
-  if (answer.status != Message::OK)
+  if (answer.status_ != Message::OK)
     {
       fallSick();
       return FullDestination();
     }
-  return FullDestination(answer.value.c_str(), answer.value, (destination == SAM_GENERATE_MY_DESTINATION));
+  return FullDestination(answer.value_.c_str(), answer.value_, (destination == SAM_GENERATE_MY_DESTINATION.data()));
 }
 
 /*static*/
@@ -788,7 +793,7 @@ RawSession::RawSession(RawSession &rhs)
   myDestination_ = rhs.myDestination_;
   rhs.fallSick();
   rhs.socket_.close();
-  (void) createRawSession(myDestination_.priv);
+  (void) createRawSession(myDestination_.priv_);
 #ifdef DEBUG_ON_STDOUT
   std::cout << "Created a new SAM datagram session (" << sessionID_ << ")  from another (" << rhs.sessionID_ << ")" << std::endl;
 #endif // DEBUG_ON_STDOUT
@@ -803,7 +808,7 @@ RawSession::~RawSession()
 
 FullDestination RawSession::createRawSession(const std::string& destination)
 {
-    return createRawSession(destination, SAM_SIGNATURE_TYPE);
+    return createRawSession(destination, SAM_SIGNATURE_TYPE.data());
 }
 
 FullDestination RawSession::createRawSession(const std::string& destination, const std::string& sigType)
@@ -816,12 +821,12 @@ FullDestination RawSession::createRawSession(const std::string& destination, con
   typedef Message::Answer<const std::string> AnswerType;
 
   const AnswerType answer = createRawSession(socket_, sessionID_, nickname_, listenPortUDP_, listenAddress_, destination, i2pOptions, sigType);
-  if (answer.status != Message::OK)
+  if (answer.status_ != Message::OK)
     {
       fallSick();
       return FullDestination();
     }
-  return FullDestination(answer.value.c_str(), answer.value, (destination == SAM_GENERATE_MY_DESTINATION));
+  return FullDestination(answer.value_.c_str(), answer.value_, (destination == SAM_GENERATE_MY_DESTINATION.data()));
 }
 
 FullDestination RawSession::createSession(const std::string& destination, const std::string& sigType, const std::string& i2pOptions)
@@ -829,12 +834,12 @@ FullDestination RawSession::createSession(const std::string& destination, const 
   typedef Message::Answer<const std::string> AnswerType;
 
   const AnswerType answer = createRawSession(socket_, sessionID_, nickname_, listenPortUDP_, listenAddress_, destination, i2pOptions, sigType);
-  if (answer.status != Message::OK)
+  if (answer.status_ != Message::OK)
     {
       fallSick();
       return FullDestination();
     }
-  return FullDestination(answer.value.c_str(), answer.value, (destination == SAM_GENERATE_MY_DESTINATION));
+  return FullDestination(answer.value_.c_str(), answer.value_, (destination == SAM_GENERATE_MY_DESTINATION.data()));
 }
 
 /*static*/
@@ -1141,7 +1146,7 @@ std::string Message::getValue(const std::string &answer, const std::string &key)
 extern "C"
 {
 
-#include "i2psam-c.h"
+#include "i2psam/i2psam-c.h"
 
 struct i2psam_stream_session { SAM::StreamSession *impl = nullptr; };
 
@@ -1249,7 +1254,7 @@ int i2psam_forward(struct i2psam_stream_session *session, const char *host, uint
   std::string remote(host);
   auto result = session->impl->forward(host, port, silent);
 
-  if (result.isOk)
+  if (result.isOk_)
     return 0;
   else
     return -1;
@@ -1259,25 +1264,25 @@ const char *i2psam_namelookup(struct i2psam_stream_session *session, const char 
 {
   auto result = session->impl->namingLookup(name);
 
-  if (result.isOk)
-    return strdup(result.value.c_str());
+  if (result.isOk_)
+    return strdup(result.value_.c_str());
   else
     return nullptr;
 }
 
-struct i2psam_destination *i2psam_dest_generate(struct i2psam_stream_session *session)
-{
-  auto result = session->impl->destGenerate();
-  if (result.isOk)
-    {
-      struct i2psam_destination *dest = new i2psam_destination;
-      dest->pub = strdup(result.value.pub.c_str());
-      dest->priv = strdup(result.value.priv.c_str());
-      return dest;
-    }
-  else
-    return nullptr;
-}
+// struct i2psam_destination *i2psam_dest_generate(struct i2psam_stream_session *session)
+// {
+//   auto result = session->impl->destGenerate();
+//   if (result.isOk_)
+//     {
+//       struct i2psam_destination *dest = new i2psam_destination;
+//       dest->pub = strdup(result.value_.pub.c_str());
+//       dest->priv = strdup(result.value_.priv.c_str());
+//       return dest;
+//     }
+//   else
+//     return nullptr;
+// }
 
 void i2psam_stop_forwarding(struct i2psam_stream_session *session, const char *host, uint16_t port)
 {
@@ -1293,8 +1298,8 @@ struct i2psam_destination *i2psam_get_my_destination(struct i2psam_stream_sessio
 {
   struct i2psam_destination *dest = new i2psam_destination;
   const auto &mydest = session->impl->getMyDestination();
-  dest->pub = strdup(mydest.pub.c_str());
-  dest->priv = strdup(mydest.priv.c_str());
+  dest->pub = strdup(mydest.pub_.c_str());
+  dest->priv = strdup(mydest.priv_.c_str());
   return dest;
 }
 

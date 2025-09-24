@@ -7,7 +7,7 @@ A C++ library for the [SAM v3 API](https://geti2p.net/en/docs/api/samv3).
 ## Development Status
 
 The library will require SAM v3.1 server.  
-Pre-release (ongoing refactoring work and migration to C++11).
+Pre-release (ongoing refactoring work and migration to C++20).
 
 ## Usage
 

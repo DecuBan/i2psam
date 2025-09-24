@@ -1,0 +1,52 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 23,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "debug clang 21 with libc++",
+      "description": "Debug build preset",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "/usr/bin/clang-21",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++-21",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++ -Wall -Wextra -Wpedantic -g"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "release clang 21 with libc++",
+      "description": "Release build preset",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "/usr/bin/clang-21",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++-21",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++ -O3 -mavx2 -mbmi2"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    }
+  ]
+}
