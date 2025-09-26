@@ -1,4 +1,5 @@
-[![License](https://img.shields.io/github/license/i2p/i2psam.svg)](https://github.com/i2p/i2psam/blob/master/LICENSE)
+![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
+![c++20](https://img.shields.io/badge/cpp-c%2B%2B20-green)
 
 # i2psam
 
@@ -9,22 +10,55 @@ A C++ library for the [SAM v3 API](https://geti2p.net/en/docs/api/samv3).
 The library will require SAM v3.1 server.  
 Pre-release (ongoing refactoring work and migration to C++20).
 
-## Usage
+## Build
 
-### Library
+* **Build presets:**
 
-Copy the files `i2psam.cpp` and `i2psam.h` into your codebase.  
-You can also build the library `libi2psam.a`:
+* Debug
+* Release
 
-```
-make
-```
+1. **Configure**
 
-### Example
+    ```bash
+    cmake --preset=release
+    ```
 
-See `eepget.cpp` for example TCP client usage.  
-Build with:
+2. **Build**
 
-```
-make eepget
-```
+    ```bash
+    cmake --build --clean-first --preset=release
+    ```
+
+## Installation
+
+* **Install**
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/DecuBan/i2psam.git && cd i2psam
+   ```
+
+2. **Compile**
+
+    ``` bash
+    cmake --preset=release
+    ```
+    
+    ```bash
+    cmake --build --preset=release
+    ```
+3. **Install**
+
+    ```bash
+    sudo cmake --install build
+    ```
+
+* **Uninstall**
+
+    ```bash
+    sudo cmake --build build --target uninstall
+    ```
+
+## LICENSE
+[![LICENSE](https://img.shields.io/github/license/i2p/i2psam.svg)](LICENSE)

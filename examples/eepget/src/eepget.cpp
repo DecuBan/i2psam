@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
 
   while (!reply.empty()) {
     std::cout << reply << std::flush;
+
     reply = conn->read();
   }
 
